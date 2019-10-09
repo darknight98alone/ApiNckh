@@ -3,31 +3,31 @@
 - [x] API nhận text và ID, đẩy lên elastic search.
 json client gửi lên có định dạng:  
   {  
-  "mac":"123456sodp",  
-  "id":"1",  
-  "contents":"noi dung cua file"  
+  &nbsp;&nbsp;&nbsp;"mac":"123456sodp",  
+  &nbsp;&nbsp;&nbsp;"id":"1",  
+  &nbsp;&nbsp;&nbsp;"contents":"noi dung cua file"  
   }  
 - [x] API gửi lên đoạn text, trả về danh sách các tên file, nội dung của file được giới hạn 100 từ và ID đi kèm
 json client gửi lên có dạng:  
 {  
-	"mac":"documents",  
-	"search_contents":"khong co viec gi kho"  
+	&nbsp;&nbsp;&nbsp;"mac":"documents",  
+	&nbsp;&nbsp;&nbsp;"search_contents":"khong co viec gi kho"  
 }  
 json trả về có dạng mảng:  
 [  
     {  
-        "_source": {  
-            "id": "1",  
-            "contents": "khong co",  
-            "filename": "test.txt"  
-        }  
+        &nbsp;&nbsp;&nbsp;"_source": {  
+            &nbsp;&nbsp;&nbsp;"id": "1",  
+            &nbsp;&nbsp;&nbsp;"contents": "khong co",  
+            &nbsp;&nbsp;&nbsp;"filename": "test.txt"  
+        &nbsp;&nbsp;&nbsp;}  
     },  
     {  
-        "_source": {  
-            "id": "2",  
-            "contents": "không có việc gì khó chỉ sợ lòng không bền",  
-            "filename": "temp.txt"  
-        }  
+        &nbsp;&nbsp;&nbsp;"_source": {  
+            &nbsp;&nbsp;&nbsp;"id": "2",  
+            &nbsp;&nbsp;&nbsp;"contents": "không có việc gì khó chỉ sợ lòng không bền",  
+            &nbsp;&nbsp;&nbsp;"filename": "temp.txt"  
+        &nbsp;&nbsp;&nbsp;}  
     }  
 ]  
 - API nhận tên file và ID, chỉ trả về file text
