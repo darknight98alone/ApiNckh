@@ -31,4 +31,9 @@ json trả về có dạng mảng:
     }
 ]  
 - API nhận ID, chỉ trả về file text
+api: localhost:8080/getAllContents
+json client tải lên có dạng:  
+{  
+	"id":"1"  
+}  
 - API Download sẽ tải file gốc về

@@ -165,11 +165,21 @@ func getAllContents(w http.ResponseWriter, r *http.Request) {
 	} else {
 		json.Unmarshal(reqBody, &newEvent)
 		w.WriteHeader(http.StatusCreated)
+		if exists("./saved/" + newEvent.ID) {
+			listFile := returnAllFileName("./saved/" + newEvent.ID)
+			for _, value := range listFile {
+				if strings.Contains(value, "txt") {
+					content, _ := ioutil.ReadFile("./saved/" + newEvent.ID + "/" + value)
+					fmt.Fprint(w, string(content))
+					break
+				}
+			}
+		}
 	}
 }
 
 func setupRoutes() {
-	http.HandleFunc("/getAllContents", search)
+	http.HandleFunc("/getAllContents", getAllContents)
 	http.HandleFunc("/search", search)
 	http.HandleFunc("/pushtextandid", receiveContentAndID)
 	http.ListenAndServe(":8080", nil)
