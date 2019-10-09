@@ -14,7 +14,7 @@ json client gửi lên có dạng:
 	&nbsp;&nbsp;&nbsp;"search_contents":"khong co viec gi kho"  
 }  
 json trả về có dạng mảng:  
-[  
+[
     {  
         &nbsp;&nbsp;&nbsp;"_source": {  
             &nbsp;&nbsp;&nbsp;"id": "1",  
@@ -28,7 +28,7 @@ json trả về có dạng mảng:
             &nbsp;&nbsp;&nbsp;"contents": "không có việc gì khó chỉ sợ lòng không bền",  
             &nbsp;&nbsp;&nbsp;"filename": "temp.txt"  
         &nbsp;&nbsp;&nbsp;}  
-    }  
+    }
 ]  
 - API nhận tên file và ID, chỉ trả về file text
 - API Download sẽ tải file gốc về
