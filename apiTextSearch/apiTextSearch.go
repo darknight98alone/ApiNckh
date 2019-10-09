@@ -153,7 +153,33 @@ func handleRet(b []byte, limit int) []byte {
 	return js
 }
 
+type idstruct struct {
+	ID string `json:"id"`
+}
+
+func getAllContents(w http.ResponseWriter, r *http.Request) {
+	var newEvent idstruct
+	reqBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		fmt.Fprintf(w, "data is not enable")
+	} else {
+		json.Unmarshal(reqBody, &newEvent)
+		w.WriteHeader(http.StatusCreated)
+		if exists("./saved/" + newEvent.ID) {
+			listFile := returnAllFileName("./saved/" + newEvent.ID)
+			for _, value := range listFile {
+				if strings.Contains(value, "txt") {
+					content, _ := ioutil.ReadFile("./saved/" + newEvent.ID + "/" + value)
+					fmt.Fprint(w, string(content))
+					break
+				}
+			}
+		}
+	}
+}
+
 func setupRoutes() {
+	http.HandleFunc("/getAllContents", getAllContents)
 	http.HandleFunc("/search", search)
 	http.HandleFunc("/pushtextandid", receiveContentAndID)
 	http.ListenAndServe(":8080", nil)

@@ -1,5 +1,5 @@
 # ApiNckh  
-- API để lưu file cho phép đẩy file lên, trả về text và ID, thêm mức độ để xử lý file đẩy lên, (deskew, deblur, autofill, xử lý bảng,
+- API để lưu file cho phép đẩy file lên, trả về text và ID, thêm mức độ để xử lý file đẩy lên, (deskew, deblur, autofill, xử lý bảng,(lưu file và text cùng thư mục temp)
 - [x] API nhận text và ID, đẩy lên elastic search.
 json client gửi lên có định dạng:  
   {  
@@ -30,5 +30,10 @@ json trả về có dạng mảng:
         &nbsp;&nbsp;&nbsp;}  
     }
 ]  
-- API nhận tên file và ID, chỉ trả về file text
+- API nhận ID, chỉ trả về file text
+api: localhost:8080/getAllContents
+json client tải lên có dạng:  
+{  
+	"id":"1"  
+}  
 - API Download sẽ tải file gốc về
