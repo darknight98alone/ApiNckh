@@ -153,7 +153,23 @@ func handleRet(b []byte, limit int) []byte {
 	return js
 }
 
+type idstruct struct {
+	ID string `json:"id"`
+}
+
+func getAllContents(w http.ResponseWriter, r *http.Request) {
+	var newEvent idstruct
+	reqBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		fmt.Fprintf(w, "data is not enable")
+	} else {
+		json.Unmarshal(reqBody, &newEvent)
+		w.WriteHeader(http.StatusCreated)
+	}
+}
+
 func setupRoutes() {
+	http.HandleFunc("/getAllContents", search)
 	http.HandleFunc("/search", search)
 	http.HandleFunc("/pushtextandid", receiveContentAndID)
 	http.ListenAndServe(":8080", nil)
