@@ -30,5 +30,5 @@ json trả về có dạng mảng:
         &nbsp;&nbsp;&nbsp;}  
     }
 ]  
-- API nhận tên file và ID, chỉ trả về file text
+- API nhận ID, chỉ trả về file text
 - API Download sẽ tải file gốc về
