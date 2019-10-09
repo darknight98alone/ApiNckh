@@ -192,7 +192,7 @@ func downloadFile(writer http.ResponseWriter, r *http.Request) {
 		if exists("./saved/" + newEvent.ID) {
 			listFile := returnAllFileName("./saved/" + newEvent.ID)
 			for _, value := range listFile {
-				if len(listFile) > 2 {
+				if len(listFile) > 1 {
 					if !strings.Contains(value, "txt") && strings.Contains(value, ".") {
 						fileName = value
 						break
@@ -254,7 +254,7 @@ func getExt(writer http.ResponseWriter, r *http.Request) {
 		if exists("./saved/" + newEvent.ID) {
 			listFile := returnAllFileName("./saved/" + newEvent.ID)
 			for _, value := range listFile {
-				if len(listFile) > 2 {
+				if len(listFile) > 1 {
 					if !strings.Contains(value, "txt") && strings.Contains(value, ".") {
 						fmt.Fprintf(writer, strings.Split(value, ".")[1])
 						break
