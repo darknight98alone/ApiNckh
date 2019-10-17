@@ -8,9 +8,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 // json for recieve file contents and id
@@ -110,6 +113,8 @@ func search(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, searchElastic(newEvent))
 	}
 }
+
+// one person have one database for searching use mac id
 
 func searchElastic(item searchItem) string {
 	url := "http://localhost:9200/" + item.Mac + "/document/_search?filter_path=hits.hits._source"
@@ -269,7 +274,50 @@ func getExt(writer http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+
+type options struct {
+	ID           string `json:"id"`
+	Deskew       string `json:"deskew"`
+	Deblur       string `json:"deblur"`
+	TableBasic   string `json:"table_basic"`
+	TableAdvance string `json:"table_advance"`
+}
+
+func putOptions(writer http.ResponseWriter, r *http.Request) {
+	var newEvent options
+	reqBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		fmt.Fprintf(writer, "error")
+		writer.WriteHeader(http.StatusNotAcceptable)
+	} else {
+		json.Unmarshal(reqBody, &newEvent)
+		writer.WriteHeader(http.StatusCreated)
+		dir := ""
+		if newEvent.ID == "" {
+			for {
+				id, err := uuid.NewUUID()
+				if err == nil {
+					if !exists("./saved/" + id.String()) {
+						os.Mkdir("./temp/"+id.String(), os.ModePerm)
+						dir = "./temp/" + id.String()
+						break
+					}
+				}
+			}
+		} else {
+			dir = "./saved/" + newEvent.ID
+		}
+		file, _ := os.Open(path.Join(dir, "option.txt"))
+		file.WriteString(newEvent.Deblur)
+		file.WriteString(newEvent.Deskew)
+		file.WriteString(newEvent.TableBasic)
+		file.WriteString(newEvent.TableAdvance)
+	}
+
+}
+
 func setupRoutes() {
+	http.HandleFunc("/putOptions", putOptions)
 	http.HandleFunc("/getRootFileExtension", getExt)
 	http.HandleFunc("/download", downloadFile)
 	http.HandleFunc("/getAllContents", getAllContents)
@@ -279,5 +327,9 @@ func setupRoutes() {
 }
 
 func main() {
-	setupRoutes()
+	// setupRoutes()
+	f, _ := os.Open("temp.txt")
+	f.WriteString("pham van dan")
+	f.WriteString("pham van dan")
+	f.Close()
 }
