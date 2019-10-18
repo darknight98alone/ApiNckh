@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -275,48 +276,107 @@ func getExt(writer http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type options struct {
-	ID           string `json:"id"`
+type option struct {
 	Deskew       string `json:"deskew"`
 	Deblur       string `json:"deblur"`
 	TableBasic   string `json:"table_basic"`
 	TableAdvance string `json:"table_advance"`
 }
 
+type customOptions struct {
+	Mac      string   `json:"mac"`
+	FileType string   `json:"file_type"`
+	FileName string   `json:"file_name"`
+	Options  []option `json:"options"`
+}
+
 func putOptions(writer http.ResponseWriter, r *http.Request) {
-	var newEvent options
+	var newEvent customOptions
 	reqBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		fmt.Fprintf(writer, "error")
 		writer.WriteHeader(http.StatusNotAcceptable)
 	} else {
 		json.Unmarshal(reqBody, &newEvent)
-		writer.WriteHeader(http.StatusCreated)
-		dir := ""
-		if newEvent.ID == "" {
-			for {
-				id, err := uuid.NewUUID()
-				if err == nil {
-					if !exists("./saved/" + id.String()) {
-						os.Mkdir("./temp/"+id.String(), os.ModePerm)
-						dir = "./temp/" + id.String()
-						break
-					}
+		// dir := ""
+		if !exists("./temp/" + newEvent.Mac) {
+			os.Mkdir("./temp/"+newEvent.Mac, os.ModePerm)
+		}
+		id, err := uuid.NewUUID()
+		for {
+			if err == nil {
+				if !exists("./saved/"+newEvent.Mac+"/"+id.String()) && !exists("./temp/"+newEvent.Mac+"/"+id.String()) {
+					os.Mkdir("./temp/"+newEvent.Mac+"/"+id.String(), os.ModePerm)
+					// dir = "./temp/" + newEvent.Mac + "/" + id.String()
+					break
 				}
 			}
-		} else {
-			dir = "./saved/" + newEvent.ID
+			id, err = uuid.NewUUID()
 		}
-		file, _ := os.Open(path.Join(dir, "option.txt"))
-		file.WriteString(newEvent.Deblur)
-		file.WriteString(newEvent.Deskew)
-		file.WriteString(newEvent.TableBasic)
-		file.WriteString(newEvent.TableAdvance)
+		// file, _ := os.Create(path.Join(dir, "option.txt"))
+		// file.WriteString(newEvent.FileName)
+		// file.WriteString("\n" + newEvent.FileType)
+		// for _, val := range newEvent.Options {
+		// 	file.WriteString("\n" + val.Deskew)
+		// 	file.WriteString("\n" + val.Deblur)
+		// 	file.WriteString("\n" + val.TableBasic)
+		// 	file.WriteString("\n" + val.TableAdvance)
+		// }
+		fmt.Fprintf(writer, id.String())
+		writer.WriteHeader(http.StatusCreated)
 	}
+}
 
+// localhost:8080/?id=1234&mac=1
+
+func getInformationRequest(r *http.Request, key string) (string, bool) {
+	temp, err := r.URL.Query()[key]
+	id := strings.Join(temp, "")
+	return id, err
+}
+
+func putFile(writer http.ResponseWriter, r *http.Request) {
+	id, ok1 := getInformationRequest(r, "id")
+	mac, ok2 := getInformationRequest(r, "mac")
+	skew, ok3 := getInformationRequest(r, "skew")
+	blur, ok4 := getInformationRequest(r, "blur")
+	basic, ok5 := getInformationRequest(r, "basic")
+	advance, ok6 := getInformationRequest(r, "advance")
+	fileType, ok7 := getInformationRequest(r, "filetype")
+	fileName, ok8 := getInformationRequest(r, "filename")
+	tempdir := "./temp/" + mac + "/" + id + "/"
+	// savedir = "./saved/" + mac + "/" + id
+	reqBody, err := ioutil.ReadAll(r.Body)
+	if !(ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8) || !exists(tempdir) || err != nil {
+		fmt.Fprintf(writer, "error")
+		writer.WriteHeader(http.StatusNotAcceptable)
+		return
+	}
+	// save file
+	if exists("./" + path.Join(tempdir, fileName+"."+fileType)) {
+		fmt.Fprintf(writer, "file name is existed")
+		writer.WriteHeader(http.StatusNotAcceptable)
+		return
+	}
+	file, _ := os.Create("./" + path.Join(tempdir, fileName+"."+fileType))
+	file.Write(reqBody)
+	file.Close()
+	if err != nil {
+		fmt.Fprintf(writer, "error")
+		writer.WriteHeader(http.StatusNotAcceptable)
+		return
+	}
+	folder := tempdir
+	fileTextToSave := "text.txt"
+	// python3 detai.py -ft pdf -fd ./save/ -fs text.txt
+	cmd := exec.Command("python3", "detai.py", "-ft", fileType, "-fd", folder, "-fs", fileTextToSave,
+		"-skew", skew, "-blur", blur, "-basic", basic, "-advance", advance)
+	log.Println(cmd.Run())
+	writer.WriteHeader(http.StatusCreated)
 }
 
 func setupRoutes() {
+	http.HandleFunc("/recieveFile/", putFile)
 	http.HandleFunc("/putOptions", putOptions)
 	http.HandleFunc("/getRootFileExtension", getExt)
 	http.HandleFunc("/download", downloadFile)
@@ -327,9 +387,5 @@ func setupRoutes() {
 }
 
 func main() {
-	// setupRoutes()
-	f, _ := os.Open("temp.txt")
-	f.WriteString("pham van dan")
-	f.WriteString("pham van dan")
-	f.Close()
+	setupRoutes()
 }
