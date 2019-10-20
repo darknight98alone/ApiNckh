@@ -1,5 +1,13 @@
-# ApiNckh  
-- API để lưu file cho phép đẩy file lên, trả về text và ID, thêm mức độ để xử lý file đẩy lên, (deskew, deblur, autofill, xử lý bảng,(lưu file và text cùng thư mục temp)
+# ApiNckh
+- API gửi tới server để server cấp id cho có dạng:  
+> localhost:8080/putOptions  
+> json have format:  
+{  
+	"mac":"1234"  
+}  
+- API để lưu file cho phép đẩy file lên, trả về text và ID, thêm mức độ để xử lý file đẩy lên, (deskew, deblur, autofill, xử lý bảng,(lưu file và text cùng thư mục temp)  
+> api with parameter have format:  
+localhost:8080/recieveFile/?id=0db1169f-f30d-11e9-bf41-049226165991&mac=1234&skew=true&blur=false&basic=false&advance=false&filetype=pdf&filename=dan  
 - [x] API nhận text và ID, đẩy lên elastic search.
 api có dạng: localhost:8080//pushtextandid  
 json client gửi lên có định dạng:  
@@ -36,18 +44,21 @@ json trả về có dạng mảng:
 api: localhost:8080/getAllContents  
 json client tải lên có dạng:    
 {  
-	"id":"1"  
+	"id":"1",
+	"mac":"1234"  
 }  
-- API Download nhận id từ client và trả file gốc về
 + trước tiên phải gọi tới Api con trả về extension của file gốc
 api có dạng: localhost:8080/getRootFileExtension  
 json client tải lên có dạng:    
 {  
-	"id":"1"  
-}
-+ sau đó sẽ gọi tới Api download file gốc về  
-api có dạng: localhost:8080/download  
-json client tải lên có dạng:    
-{  
-	"id":"1"  
+	"id":"1",  
+	"mac":"1234"  
 }  
+- API Download nhận id từ client và trả file gốc về:  
+> api have format: localhost:8080/download  
+> json client send have format:  
+>{  
+"mac": "1234",  
+"id": "123",  
+}  
+
