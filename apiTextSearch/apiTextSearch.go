@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 )
@@ -24,29 +25,62 @@ type event struct {
 	Contents string `json:"contents"`
 }
 
+func retError(w http.ResponseWriter, message string) {
+	fmt.Fprintf(w, message)
+	w.WriteHeader(406)
+}
+
 func receiveContentAndID(w http.ResponseWriter, r *http.Request) {
 	var newEvent event
 	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		fmt.Fprintf(w, "data is not enable")
+	if err != nil || len(reqBody) == 0 {
+		retError(w, "wrong data")
 	} else {
 		json.Unmarshal(reqBody, &newEvent)
-		w.WriteHeader(http.StatusCreated)
-		if moveFolderToSaved(newEvent.ID) {
-			pushToDb(newEvent)
+		if standardString(newEvent.Mac) == "" || standardString(newEvent.ID) == "" {
+			retError(w, "wrong data")
+			return
+		}
+		if exists("./temp/" + newEvent.Mac + "/" + newEvent.ID) {
+			w.WriteHeader(http.StatusCreated)
+			err := pushToDb(newEvent)
+			if !err {
+				retError(w, "elastic disconnect")
+				return
+			}
+			if !moveFolderToSaved(newEvent.Mac, newEvent.ID) {
+				retError(w, "save fail")
+				return
+			}
+			os.Remove("./saved/" + newEvent.Mac + "/" + newEvent.ID + "/text.txt")
+			f, _ := os.OpenFile("./saved/"+newEvent.Mac+"/"+newEvent.ID+"/text.txt", os.O_CREATE|os.O_WRONLY, 0600)
+			f.WriteString(newEvent.Contents)
+		} else {
+			retError(w, "wrong data")
+			return
 		}
 	}
 }
 
-func pushToDb(item event) {
+func pushToDb(item event) bool {
 	url := "http://localhost:9200/" + item.Mac + "/document/"
 	payload := strings.NewReader("{\n\t\"id\":\"" + item.ID + "\",\n\t\"contents\":\"" + item.Contents + "\"\n}")
-	req, _ := http.NewRequest("POST", url, payload)
+	req, err1 := http.NewRequest("POST", url, payload)
+	if err1 != nil {
+		return false
+	}
 	req.Header.Add("content-type", "application/json")
 	req.Header.Add("cache-control", "no-cache")
 	req.Header.Add("postman-token", "a842a97b-8d7b-9fe6-e304-f8420e7e1892")
-	res, _ := http.DefaultClient.Do(req)
+	res, err2 := http.DefaultClient.Do(req)
+	if res == nil {
+		return false
+	}
 	res.Body.Close()
+	if err2 != nil {
+		return false
+	}
+	return true
 }
 
 func makeNewDir(path string) {
@@ -68,11 +102,16 @@ func returnAllFileName(root string) []string {
 	return files[1:]
 }
 
-func moveFolderToSaved(folderID string) bool {
-	newDir := "./saved/" + folderID
-	oldDir := "./temp/" + folderID
+func moveFolderToSaved(mac string, folderID string) bool {
+	newDir := "./saved/" + mac + "/" + folderID
+	oldDir := "./temp/" + mac + "/" + folderID
 	if exists(oldDir) {
-		makeNewDir(newDir)
+		if !exists("./saved/" + mac) {
+			makeNewDir("./saved/" + mac)
+		}
+		if !exists("./saved/" + mac + "/" + folderID) {
+			makeNewDir(newDir)
+		}
 		files := returnAllFileName(oldDir)
 		for _, f := range files {
 			err := os.Rename(oldDir+"/"+f, newDir+"/"+f)
@@ -80,7 +119,7 @@ func moveFolderToSaved(folderID string) bool {
 				log.Fatal(err)
 			}
 		}
-		os.RemoveAll(oldDir)
+		os.RemoveAll("./temp/" + mac)
 		return true
 	}
 	return false
@@ -106,12 +145,20 @@ type searchItem struct {
 func search(w http.ResponseWriter, r *http.Request) {
 	var newEvent searchItem
 	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		fmt.Fprintf(w, "data is not enable")
+	if err != nil || len(reqBody) == 0 {
+		retError(w, "wrong data")
 	} else {
 		json.Unmarshal(reqBody, &newEvent)
-		w.WriteHeader(http.StatusCreated)
-		fmt.Fprintf(w, searchElastic(newEvent))
+		if standardString(newEvent.Mac) != "" && exists("./saved/"+newEvent.Mac) {
+			result := searchElastic(newEvent)
+			if result != "err" {
+				fmt.Fprintf(w, result)
+				w.WriteHeader(http.StatusCreated)
+				return
+			}
+		}
+		retError(w, "wrong data")
+		return
 	}
 }
 
@@ -126,9 +173,13 @@ func searchElastic(item searchItem) string {
 	req.Header.Add("cache-control", "no-cache")
 	req.Header.Add("postman-token", "c5da7799-0243-0446-8a9d-0c59bd95a810")
 	res, _ := http.DefaultClient.Do(req)
+	if res == nil {
+		return "err"
+	}
 	body, _ := ioutil.ReadAll(res.Body)
+	temp := string(handleRet(body, 100, item.Mac))
 	res.Body.Close()
-	return string(handleRet(body, 100))
+	return temp
 }
 
 type inner struct {
@@ -148,13 +199,15 @@ type outest struct {
 	Z out `json:"hits"`
 }
 
-func handleRet(b []byte, limit int) []byte {
+func handleRet(b []byte, limit int, mac string) []byte {
 	var cont outest
 	json.Unmarshal(b, &cont)
 	for i := 0; i < len(cont.Z.Y); i++ {
-		cont.Z.Y[i].X.C = returnAllFileName("./saved/" + cont.Z.Y[i].X.A)[0]
-		if len(cont.Z.Y[i].X.B) > limit {
-			cont.Z.Y[i].X.B = cont.Z.Y[i].X.B[:limit]
+		if exists("./saved/" + mac + "/" + cont.Z.Y[i].X.A) {
+			cont.Z.Y[i].X.C = returnAllFileName("./saved/" + mac + "/" + cont.Z.Y[i].X.A)[0]
+			if len(cont.Z.Y[i].X.B) > limit {
+				cont.Z.Y[i].X.B = cont.Z.Y[i].X.B[:limit]
+			}
 		}
 	}
 	js, _ := json.Marshal(cont.Z.Y)
@@ -162,26 +215,41 @@ func handleRet(b []byte, limit int) []byte {
 }
 
 type idstruct struct {
-	ID string `json:"id"`
+	ID  string `json:"id"`
+	Mac string `json:"mac"`
+}
+
+func standardString(input string) string {
+	temp := strings.ToLower(input)
+	temp = strings.ReplaceAll(temp, " ", "")
+	return temp
 }
 
 func getAllContents(w http.ResponseWriter, r *http.Request) {
 	var newEvent idstruct
 	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		fmt.Fprintf(w, "data is not enable")
+	if err != nil || len(reqBody) == 0 {
+		retError(w, "wrong data")
 	} else {
 		json.Unmarshal(reqBody, &newEvent)
-		w.WriteHeader(http.StatusCreated)
-		if exists("./saved/" + newEvent.ID) {
-			listFile := returnAllFileName("./saved/" + newEvent.ID)
+		if standardString(newEvent.ID) == "" || standardString(newEvent.Mac) == "" {
+			retError(w, "wrong data")
+			return
+		}
+		dir := "./saved/" + newEvent.Mac + "/" + newEvent.ID
+		if exists(dir) {
+			listFile := returnAllFileName(dir)
 			for _, value := range listFile {
 				if strings.Contains(value, "txt") {
-					content, _ := ioutil.ReadFile("./saved/" + newEvent.ID + "/" + value)
+					content, _ := ioutil.ReadFile(dir + "/" + value)
 					fmt.Fprint(w, string(content))
 					break
 				}
 			}
+			w.WriteHeader(http.StatusCreated)
+		} else {
+			retError(w, "wrong data")
+			return
 		}
 	}
 }
@@ -190,30 +258,38 @@ func downloadFile(writer http.ResponseWriter, r *http.Request) {
 	var newEvent idstruct
 	var fileName string
 	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		fmt.Fprintf(writer, "data is not enable")
+	if err != nil || len(reqBody) == 0 {
+		retError(writer, "wrong data")
 	} else {
 		json.Unmarshal(reqBody, &newEvent)
-		writer.WriteHeader(http.StatusCreated)
-		if exists("./saved/" + newEvent.ID) {
-			listFile := returnAllFileName("./saved/" + newEvent.ID)
-			for _, value := range listFile {
-				if len(listFile) > 1 {
-					if !strings.Contains(value, "txt") && strings.Contains(value, ".") {
-						fileName = value
-						break
-					}
-				} else {
-					if strings.Contains(value, ".") {
-						fileName = value
-						break
+		if standardString(newEvent.ID) != "" && standardString(newEvent.Mac) != "" {
+			dir := "./saved/" + newEvent.Mac + "/" + newEvent.ID
+			if exists(dir) {
+				listFile := returnAllFileName(dir)
+				for _, value := range listFile {
+					if len(listFile) > 1 {
+						if !strings.Contains(value, "txt") && strings.Contains(value, ".") {
+							fileName = value
+							break
+						}
+					} else {
+						if strings.Contains(value, ".") {
+							fileName = value
+							break
+						}
 					}
 				}
-
+				writer.WriteHeader(http.StatusCreated)
+			} else {
+				retError(writer, "wrong data")
+				return
 			}
+		} else {
+			retError(writer, "wrong data")
+			return
 		}
 	}
-	Filename := "./saved/" + newEvent.ID + "/" + fileName
+	Filename := "./saved/" + newEvent.Mac + "/" + newEvent.ID + "/" + fileName
 	//Check if file exists and open
 	Openfile, err := os.Open(Filename)
 	defer Openfile.Close() //Close after function return
@@ -252,13 +328,17 @@ func downloadFile(writer http.ResponseWriter, r *http.Request) {
 func getExt(writer http.ResponseWriter, r *http.Request) {
 	var newEvent idstruct
 	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		fmt.Fprintf(writer, "data is not enable")
+	if err != nil || len(reqBody) == 0 {
+		retError(writer, "wrong data")
 	} else {
 		json.Unmarshal(reqBody, &newEvent)
-		writer.WriteHeader(http.StatusCreated)
-		if exists("./saved/" + newEvent.ID) {
-			listFile := returnAllFileName("./saved/" + newEvent.ID)
+		if standardString(newEvent.ID) == "" || standardString(newEvent.Mac) == "" {
+			retError(writer, "wrong data")
+			return
+		}
+		dir := "./saved/" + newEvent.Mac + "/" + newEvent.ID
+		if exists(dir) {
+			listFile := returnAllFileName(dir)
 			for _, value := range listFile {
 				if len(listFile) > 1 {
 					if !strings.Contains(value, "txt") && strings.Contains(value, ".") {
@@ -272,8 +352,12 @@ func getExt(writer http.ResponseWriter, r *http.Request) {
 					}
 				}
 			}
+			writer.WriteHeader(http.StatusCreated)
+			return
 		}
 	}
+	retError(writer, "wrong data")
+	return
 }
 
 type option struct {
@@ -284,21 +368,24 @@ type option struct {
 }
 
 type customOptions struct {
-	Mac      string   `json:"mac"`
-	FileType string   `json:"file_type"`
-	FileName string   `json:"file_name"`
-	Options  []option `json:"options"`
+	Mac string `json:"mac"`
+	// FileType string   `json:"file_type"`
+	// FileName string   `json:"file_name"`
+	// Options  []option `json:"options"`
 }
 
 func putOptions(writer http.ResponseWriter, r *http.Request) {
 	var newEvent customOptions
 	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		fmt.Fprintf(writer, "error")
-		writer.WriteHeader(http.StatusNotAcceptable)
+	if err != nil || len(reqBody) == 0 {
+		retError(writer, "wrong data")
 	} else {
 		json.Unmarshal(reqBody, &newEvent)
 		// dir := ""
+		if standardString(newEvent.Mac) == "" {
+			retError(writer, "wrong data")
+			return
+		}
 		if !exists("./temp/" + newEvent.Mac) {
 			os.Mkdir("./temp/"+newEvent.Mac, os.ModePerm)
 		}
@@ -347,42 +434,45 @@ func putFile(writer http.ResponseWriter, r *http.Request) {
 	tempdir := "./temp/" + mac + "/" + id + "/"
 	// savedir = "./saved/" + mac + "/" + id
 	reqBody, err := ioutil.ReadAll(r.Body)
-	if !(ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8) || !exists(tempdir) || err != nil {
-		fmt.Fprintf(writer, "error")
-		writer.WriteHeader(http.StatusNotAcceptable)
+	if !(ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8) || !exists(tempdir) || err != nil || len(reqBody) == 0 {
+		retError(writer, "wrong data")
 		return
 	}
 	// save file
 	if exists("./" + path.Join(tempdir, fileName+"."+fileType)) {
-		fmt.Fprintf(writer, "file name is existed")
-		writer.WriteHeader(http.StatusNotAcceptable)
+		retError(writer, "save fail")
 		return
 	}
 	file, _ := os.Create("./" + path.Join(tempdir, fileName+"."+fileType))
 	file.Write(reqBody)
 	file.Close()
 	if err != nil {
-		fmt.Fprintf(writer, "error")
-		writer.WriteHeader(http.StatusNotAcceptable)
+		retError(writer, "wrong data")
 		return
 	}
 	folder := tempdir
 	fileTextToSave := "text.txt"
 	// python3 detai.py -ft pdf -fd ./save/ -fs text.txt
+	var mutex = &sync.Mutex{}
+	mutex.Lock()
 	cmd := exec.Command("python3", "detai.py", "-ft", fileType, "-fd", folder, "-fs", fileTextToSave,
 		"-skew", skew, "-blur", blur, "-basic", basic, "-advance", advance)
+	mutex.Unlock()
+	// return text to client
 	log.Println(cmd.Run())
 	writer.WriteHeader(http.StatusCreated)
+	data, _ := ioutil.ReadFile(path.Join(tempdir, "text.txt"))
+	fmt.Fprintf(writer, string(data))
 }
 
 func setupRoutes() {
-	http.HandleFunc("/recieveFile/", putFile)
-	http.HandleFunc("/putOptions", putOptions)
-	http.HandleFunc("/getRootFileExtension", getExt)
-	http.HandleFunc("/download", downloadFile)
-	http.HandleFunc("/getAllContents", getAllContents)
-	http.HandleFunc("/search", search)
-	http.HandleFunc("/pushtextandid", receiveContentAndID)
+	http.HandleFunc("/recieveFile/", putFile)              // 2. put file,mac,id,options return text
+	http.HandleFunc("/putOptions", putOptions)             // 1. mac return id
+	http.HandleFunc("/getRootFileExtension", getExt)       // 6. get extension before download
+	http.HandleFunc("/download", downloadFile)             // 7. nhận id và cho phép download
+	http.HandleFunc("/getAllContents", getAllContents)     // 5. API nhận ID, chỉ trả về file text
+	http.HandleFunc("/search", search)                     // 4. search file
+	http.HandleFunc("/pushtextandid", receiveContentAndID) // 3. push to elastic search
 	http.ListenAndServe(":8080", nil)
 }
 
