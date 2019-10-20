@@ -36,7 +36,8 @@ json trả về có dạng mảng:
 api: localhost:8080/getAllContents  
 json client tải lên có dạng:    
 {  
-	"id":"1"  
+	"id":"1",
+	"mac":"1234"  
 }  
 - API Download nhận id từ client và trả file gốc về:  
 > api have format: localhost:8080/download  
@@ -49,11 +50,6 @@ json client tải lên có dạng:
 api có dạng: localhost:8080/getRootFileExtension  
 json client tải lên có dạng:    
 {  
-	"id":"1"  
+	"id":"1",  
+	"mac":"1234"  
 }
-+ sau đó sẽ gọi tới Api download file gốc về  
-api có dạng: localhost:8080/download  
-json client tải lên có dạng:    
-{  
-	"id":"1"  
-}  
