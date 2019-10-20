@@ -39,6 +39,7 @@ json client tải lên có dạng:
 	"id":"1"  
 }  
 - API Download nhận id từ client và trả file gốc về:  
+> api have format: localhost:8080/download  
 > json client send have format:  
 >{  
 "mac": "1234",  
