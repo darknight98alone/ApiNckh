@@ -38,7 +38,12 @@ json client tải lên có dạng:
 {  
 	"id":"1"  
 }  
-- API Download nhận id từ client và trả file gốc về
+- API Download nhận id từ client và trả file gốc về:  
+> json client send have format:  
+>{  
+"mac": "1234",  
+"id": "123",  
+}  
 + trước tiên phải gọi tới Api con trả về extension của file gốc
 api có dạng: localhost:8080/getRootFileExtension  
 json client tải lên có dạng:    
